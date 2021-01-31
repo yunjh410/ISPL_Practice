@@ -1,6 +1,10 @@
 import tensorflow as tf
 from preprocess import read_tfrecord
 
+from tensorflow.nn import relu, conv2d, max_pool
+from tensorflow.contrib.layers import xavier_initializer
+
+
 
 class Classifier(object):
     def __init__(self, FLAGS):
@@ -11,7 +15,25 @@ class Classifier(object):
         x: input image
         logit: network output w/o softmax """
         with tf.variable_scope('model', reuse=reuse):
-            logit = x
+
+            W1 = tf.Variable(tf.random_normal([3, 3, 1, 32], stddev=0.01))
+
+            L1 = relu(conv2d(x, W1, strides=[1, 1, 1, 1], padding='SAME'))
+            L1 = max_pool(L1, ksize=[1, 2, 2, 1],
+                            strides=[1, 2, 2, 1], padding='SAME')
+
+            W2 = tf.Variable(tf.random_normal([3, 3, 32, 64], stddev=0.01))
+            L2 = relu(conv2d(L1, W2, strides=[1, 1, 1, 1], padding='SAME'))
+            L2 = max_pool(L2, ksize=[1, 2, 2, 1],
+                            strides=[1, 2, 2, 1], padding='SAME')
+
+            L2_flat = tf.reshape(L2, [-1, 7 * 7 * 64])
+            W3 = tf.get_variable("W3", shape=[7 * 7 * 64, 10],
+                                 initializer=xavier_initializer())
+            b = tf.Variable(tf.random_normal([10]))
+
+            logit = tf.matmul(L2_flat, W3) + b
+
 
         return logit
 
@@ -42,14 +64,13 @@ class Classifier(object):
         val_accuracy = self.accuracy(val_lab, val_logit)
 
         var_list = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES) + tf.get_collection(tf.GraphKeys.LOCAL_VARIABLES)
-        saver = tf.train.Saver(max_to_keep=2, var_list = var_list)
+        saver = tf.train.Saver(max_to_keep=2, var_list=var_list)
         # session
         with tf.Session() as sess:
             if self.args.restore:
                 saver.restore(sess, tf.train.latest_checkpoint(self.args.ckptdir))
             else:
                 sess.run([tf.global_variables_initializer(), tf.local_variables_initializer()])
-
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
@@ -57,17 +78,18 @@ class Classifier(object):
                 min_val_acc = 10000.
                 while not coord.should_stop():
                     global_step = sess.run(step)
-                    print(global_step)
                     batch_loss, batch_acc, _ = sess.run([loss, tr_accuracy, optimizer])
-                    if global_step%1000 == 0:
+                    if global_step % 1000 == 0:
                         print('step:: %d, loss= %.3f, accuracy= %.3f' % (global_step, batch_loss, batch_acc))
-
-                    if global_step%3000 == 0:
+                        val_acc = sess.run(val_accuracy)
+                        print('val accuracy= %.3f' % val_acc)
+                    if global_step % 3000 == 0:
                         val_acc = sess.run(val_accuracy)
                         print('val accuracy= %.3f' % val_acc)
                         if val_acc < min_val_acc:
                             min_val_acc = val_acc
-                            save_path = saver.save(sess, self.args.ckptdir+'/model_%.3f.ckpt' % val_acc, global_step = step)
+                            save_path = saver.save(sess, self.args.ckptdir + '/model_%.3f.ckpt' % val_acc,
+                                                   global_step=step)
                             print('model saved in file: %s' % save_path)
 
                     sess.run(increment_step)
@@ -78,7 +100,7 @@ class Classifier(object):
             except Exception as e:
                 coord.request_stop(e)
             finally:
-                save_path = saver.save(sess, self.args.ckptdir+'/model.ckpt', global_step = step)
+                save_path = saver.save(sess, self.args.ckptdir + '/model.ckpt', global_step=step)
                 print('model saved in file : %s' % save_path)
                 coord.request_stop()
                 coord.join(threads)
@@ -105,14 +127,13 @@ class Classifier(object):
 
             total_acc = 0.
             steps = 0
-            while steps < 10000/self.args.batch:
+            while steps < 10000 / self.args.batch:
                 batch_acc = sess.run(ts_accuracy)
                 total_acc += batch_acc
                 steps += 1
 
             total_acc /= steps
-            print('number: %d, total acc: %.1f' % (steps, total_acc*100)+'%')
+            print('number: %d, total acc: %.1f' % (steps, total_acc * 100) + '%')
 
             coord.request_stop()
             coord.join(threads)
-
