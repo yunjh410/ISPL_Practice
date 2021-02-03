@@ -1,0 +1,11 @@
+train with epoch=3, lr=1e-3, batch_size=100
+
+at training
+step:: 0, loss= 2.775, accuracy= 0.070
+step:: 1000, loss= 0.123, accuracy= 0.950
+step:: 2000, loss= 0.059, accuracy= 0.990
+
+at test 
+number: 100, total acc: 97.3%
+
+accuracy 97.3% achieved

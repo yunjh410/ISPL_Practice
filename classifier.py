@@ -79,10 +79,8 @@ class Classifier(object):
                 while not coord.should_stop():
                     global_step = sess.run(step)
                     batch_loss, batch_acc, _ = sess.run([loss, tr_accuracy, optimizer])
-                    if global_step % 1000 == 0:
+                    if global_step % 100 == 0:
                         print('step:: %d, loss= %.3f, accuracy= %.3f' % (global_step, batch_loss, batch_acc))
-                        val_acc = sess.run(val_accuracy)
-                        print('val accuracy= %.3f' % val_acc)
                     if global_step % 3000 == 0:
                         val_acc = sess.run(val_accuracy)
                         print('val accuracy= %.3f' % val_acc)
